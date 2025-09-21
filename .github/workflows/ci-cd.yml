@@ -56,6 +56,7 @@ jobs:
 
             # Go to project directory
             cd ~/ci-cd-demo
+            source ~/ci-cd-demo/myenv/bin/activate
 
             # Kill any running app.py instances
             pkill -f app.py || true
