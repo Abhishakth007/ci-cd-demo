@@ -50,6 +50,7 @@ jobs:
           username: ${{ secrets.AWS_EC2_USER }}
           key: ${{ secrets.AWS_EC2_KEY }}
           script: |
+            cd ubuntu
             cd ~/ci-cd-demo
 
             # Activate virtual environment
