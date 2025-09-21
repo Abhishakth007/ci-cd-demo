@@ -50,18 +50,15 @@ jobs:
           username: ${{ secrets.AWS_EC2_USER }}
           key: ${{ secrets.AWS_EC2_KEY }}
           script: |
-            # Install screen if missing
-            sudo apt update
-            sudo apt install -y screen
-
-            # Go to project directory
             cd ~/ci-cd-demo
+
+            # Activate virtual environment
             source ~/ci-cd-demo/myenv/bin/activate
 
-            # Kill any running app.py instances
+            # Kill any running Flask instances
             pkill -f app.py || true
 
             # Start Flask in detached screen session
-            screen -dmS flask_app python3 app.py
+            screen -dmS flask_app python app.py
 
             echo "✅ Flask app deployed successfully!"
