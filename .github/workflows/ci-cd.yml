@@ -54,8 +54,9 @@ jobs:
           host: ${{ secrets.AWS_EC2_HOST }}
           username: ${{ secrets.AWS_EC2_USER }}
           key: ${{ secrets.AWS_EC2_KEY }}
-          command_timeout: 30s
+          command_timeout: 60s
           script: |
+            set -e  # Exit on any error
             echo "🚀 Starting deployment..."
             cd ~/ci-cd-demo
 
@@ -73,54 +74,56 @@ jobs:
             echo "📦 Installing dependencies..."
             pip install -r requirements.txt
 
-            # Stop existing Flask processes
+            # Stop existing Flask processes more aggressively
             echo "🛑 Stopping existing Flask app..."
             pkill -f "python.*app.py" || true
-            screen -S flask_app -X quit || true
+            pkill -f "screen.*flask_app" || true
+            screen -wipe || true
+            
+            # Wait for cleanup
+            sleep 2
 
-            # Wait for processes to cleanup
-            sleep 3
+            # Start Flask app using nohup instead of screen
+            echo "🚀 Starting Flask app with nohup..."
+            cd ~/ci-cd-demo
+            source myenv/bin/activate
+            nohup python app.py > flask.log 2>&1 &
+            
+            # Get the PID and save it
+            FLASK_PID=$!
+            echo $FLASK_PID > flask.pid
+            echo "Flask started with PID: $FLASK_PID"
 
-            # Start Flask app in screen session
-            echo "🚀 Starting new Flask app..."
-            screen -dmS flask_app bash -c "cd ~/ci-cd-demo && source myenv/bin/activate && python app.py"
+            # Wait and verify
+            sleep 8
 
-            # Wait and verify deployment
-            sleep 5
-
-            # Check if Flask is running
-            if ps aux | grep -q "[p]ython.*app.py"; then
-              echo "✅ Flask process is running"
+            # Check if process is still running
+            if kill -0 $FLASK_PID 2>/dev/null; then
+              echo "✅ Flask process is running (PID: $FLASK_PID)"
               
               # Test if app responds
-              if curl -s --connect-timeout 10 localhost:5000 > /dev/null; then
-                echo "✅ Flask app is responding on port 5000"
-                echo "🌐 App accessible at: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):5000"
-                
-                # Test both routes
-                if curl -s --connect-timeout 5 localhost:5000/ | grep -q "Hello From CI/CD Demo"; then
-                  echo "✅ Home route (/) is working!"
-                else
-                  echo "⚠️ Home route might need a moment"
+              for i in {1..10}; do
+                if curl -s --connect-timeout 5 localhost:5000 >/dev/null 2>&1; then
+                  echo "✅ Flask app is responding on port 5000"
+                  
+                  # Quick test of routes
+                  HOME_TEST=$(curl -s localhost:5000/ 2>/dev/null || echo "failed")
+                  ABOUT_TEST=$(curl -s localhost:5000/about 2>/dev/null || echo "failed")
+                  
+                  echo "🏠 Home route: $HOME_TEST"
+                  echo "ℹ️  About route: $ABOUT_TEST"
+                  echo "🎉 Deployment completed successfully!"
+                  exit 0
                 fi
-                
-                if curl -s --connect-timeout 5 localhost:5000/about | grep -q "Testing CI"; then
-                  echo "✅ /about route is working with new code!"
-                else
-                  echo "⚠️ /about route might need a moment to load"
-                fi
-              else
-                echo "❌ Flask app not responding yet - check logs"
-                screen -S flask_app -X hardcopy /tmp/flask.log 2>/dev/null || true
-                cat /tmp/flask.log 2>/dev/null || true
-                exit 1
-              fi
+                echo "Waiting for Flask to respond... ($i/10)"
+                sleep 2
+              done
+              
+              echo "❌ Flask started but not responding after 20 seconds"
+              cat flask.log || true
+              exit 1
             else
-              echo "❌ Flask process not found"
-              echo "📋 Debug info:"
-              screen -list || true
-              ps aux | grep python || true
+              echo "❌ Flask process died immediately"
+              cat flask.log || true
               exit 1
             fi
-
-            echo "🎉 Deployment completed successfully!"
