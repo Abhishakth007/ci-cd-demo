@@ -3,8 +3,6 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
 jobs:
   build-and-test:
@@ -34,6 +32,23 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Deploy (Simulation)
-        run: |
-          echo "✅ Deploy step triggered (simulate deploying to server)"
+      - name: Copy Code to EC2
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.AWS_EC2_HOST }}
+          username: ${{ secrets.AWS_EC2_USER }}
+          key: ${{ secrets.AWS_EC2_KEY }}
+          source: "."
+          target: "~/ci-cd-demo"
+
+      - name: Restart Flask App on EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.AWS_EC2_HOST }}
+          username: ${{ secrets.AWS_EC2_USER }}
+          key: ${{ secrets.AWS_EC2_KEY }}
+          script: |
+            pkill -f app.py || true
+            cd ~/ci-cd-demo
+            nohup python3 app.py > app.log 2>&1 &
+            echo "✅ Flask app deployed and restarted!"
