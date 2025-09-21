@@ -50,16 +50,18 @@ jobs:
           username: ${{ secrets.AWS_EC2_USER }}
           key: ${{ secrets.AWS_EC2_KEY }}
           script: |
-            cd ~/ci-cd-demo
-            source ~/ci-cd-demo/myenv/bin/activate
+                  cd ~/ci-cd-demo
+                  source ~/ci-cd-demo/myenv/bin/activate
 
-            # Install dependencies (optional if already installed)
-            pip install -r requirements.txt
+                  # Install dependencies
+                  pip install -r requirements.txt
 
-            # Run Flask app briefly to confirm it works
-            python app.py &
-            sleep 5
-            pkill -f app.py
+                  # Run Flask for 5 seconds just to confirm it works
+                  python app.py &
+                  FLASK_PID=$!
+                  sleep 5
+                  kill $FLASK_PID || true
 
-            echo "✅ Flask app deployed and tested successfully!"
+                  echo "✅ Flask app deployed and verified!"
+
 
