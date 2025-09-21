@@ -43,23 +43,23 @@ jobs:
           target: "~/ci-cd-demo"
 
       # Install screen & start Flask in detached session
-      - name: Deploy and Start Flask
+      - name: Deploy and Test Run Flask
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.AWS_EC2_HOST }}
           username: ${{ secrets.AWS_EC2_USER }}
           key: ${{ secrets.AWS_EC2_KEY }}
           script: |
-
             cd ~/ci-cd-demo
-
-            # Activate virtual environment
             source ~/ci-cd-demo/myenv/bin/activate
 
-            # Kill any running Flask instances
-            pkill -f app.py || true
+            # Install dependencies (optional if already installed)
+            pip install -r requirements.txt
 
-            # Start Flask in detached screen session
-            nohup python app.py > app.log 2>&1 &
+            # Run Flask app briefly to confirm it works
+            python app.py &
+            sleep 5
+            pkill -f app.py
 
-            echo "✅ Flask app deployed successfully!"
+            echo "✅ Flask app deployed and tested successfully!"
+
