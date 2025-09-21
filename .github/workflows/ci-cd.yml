@@ -60,6 +60,6 @@ jobs:
             pkill -f app.py || true
 
             # Start Flask in detached screen session
-            screen -dmS flask_app python app.py
+            nohup python app.py > app.log 2>&1 &
 
             echo "✅ Flask app deployed successfully!"
