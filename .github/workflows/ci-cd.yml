@@ -32,6 +32,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
+      # Copy code to EC2
       - name: Copy Code to EC2
         uses: appleboy/scp-action@master
         with:
@@ -41,14 +42,25 @@ jobs:
           source: "."
           target: "~/ci-cd-demo"
 
-      - name: Restart Flask App on EC2
+      # Install screen & start Flask in detached session
+      - name: Deploy and Start Flask
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.AWS_EC2_HOST }}
           username: ${{ secrets.AWS_EC2_USER }}
           key: ${{ secrets.AWS_EC2_KEY }}
           script: |
-            pkill -f app.py || true
+            # Install screen if missing
+            sudo apt update
+            sudo apt install -y screen
+
+            # Go to project directory
             cd ~/ci-cd-demo
-            nohup python3 app.py > app.log 2>&1 &
-            echo "✅ Flask app deployed and restarted!"
+
+            # Kill any running app.py instances
+            pkill -f app.py || true
+
+            # Start Flask in detached screen session
+            screen -dmS flask_app python3 app.py
+
+            echo "✅ Flask app deployed successfully!"
