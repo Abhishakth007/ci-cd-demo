@@ -19,7 +19,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          # Install production requirements + pytest for testing
+          pip install flask pytest
 
       - name: Run Tests
         run: |
@@ -35,7 +36,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # Copy code to temporary location
+      # Copy code to EC2
       - name: Copy Code to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -43,7 +44,7 @@ jobs:
           username: ${{ secrets.AWS_EC2_USER }}
           key: ${{ secrets.AWS_EC2_KEY }}
           source: "app.py,requirements.txt"
-          target: "ci-cd-temp"
+          target: "ci-cd-demo"
           overwrite: true
 
       # Deploy and Restart Flask App
@@ -56,17 +57,6 @@ jobs:
           command_timeout: 30s
           script: |
             echo "🚀 Starting deployment..."
-            
-            # Create main directory if it doesn't exist
-            mkdir -p ~/ci-cd-demo
-            
-            # Move files from temp to main directory
-            if [ -d "~/ci-cd-temp" ]; then
-              echo "📁 Moving new files to main directory..."
-              cp ~/ci-cd-temp/* ~/ci-cd-demo/ 2>/dev/null || true
-              rm -rf ~/ci-cd-temp
-            fi
-            
             cd ~/ci-cd-demo
 
             # Create virtual environment if it doesn't exist
@@ -108,29 +98,21 @@ jobs:
                 echo "🌐 App accessible at: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):5000"
                 
                 # Test both routes
-                echo "🧪 Testing routes..."
-                HOME_RESPONSE=$(curl -s --connect-timeout 5 localhost:5000/)
-                ABOUT_RESPONSE=$(curl -s --connect-timeout 5 localhost:5000/about)
-                
-                if echo "$HOME_RESPONSE" | grep -q "Hello From CI/CD Demo"; then
-                  echo "✅ Home route (/) working: $HOME_RESPONSE"
+                if curl -s --connect-timeout 5 localhost:5000/ | grep -q "Hello From CI/CD Demo"; then
+                  echo "✅ Home route (/) is working!"
                 else
-                  echo "⚠️ Home route response: $HOME_RESPONSE"
+                  echo "⚠️ Home route might need a moment"
                 fi
                 
-                if echo "$ABOUT_RESPONSE" | grep -q "Testing CI"; then
-                  echo "✅ About route (/about) working: $ABOUT_RESPONSE"
+                if curl -s --connect-timeout 5 localhost:5000/about | grep -q "Testing CI"; then
+                  echo "✅ /about route is working with new code!"
                 else
-                  echo "⚠️ About route response: $ABOUT_RESPONSE"
+                  echo "⚠️ /about route might need a moment to load"
                 fi
               else
-                echo "❌ Flask app not responding - check logs"
-                # Try to get screen output
+                echo "❌ Flask app not responding yet - check logs"
                 screen -S flask_app -X hardcopy /tmp/flask.log 2>/dev/null || true
-                if [ -f /tmp/flask.log ]; then
-                  echo "📋 Flask logs:"
-                  cat /tmp/flask.log
-                fi
+                cat /tmp/flask.log 2>/dev/null || true
                 exit 1
               fi
             else
@@ -142,4 +124,3 @@ jobs:
             fi
 
             echo "🎉 Deployment completed successfully!"
-            echo "🌐 Your app is live at: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):5000"
