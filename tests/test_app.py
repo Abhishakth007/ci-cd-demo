@@ -11,4 +11,10 @@ def test_home_route():
     assert response.status_code == 200
     assert b"Hello From CI/CD Demo" in response.data
     
+def test_about_route():
+    client = app.test_client()
+    response = client.get("/about")
+    assert response.status_code == 200
+    assert b"Testing CI" in response.data
+    
     

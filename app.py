@@ -6,6 +6,10 @@ app = Flask(__name__)
 def home():
     return "Hello From CI/CD Demo"
 
+@app.route("/about")
+def about():
+    return "Testing CI"
+
 
 
 if __name__ == "__main__":
